@@ -3,8 +3,8 @@ import redisClient from '../utils/redis';
 import sha1 from 'sha1';
 import { ObjectID } from 'mongodb';
 
-class UserController {
-  static postNew (req, res) {
+class UsersController {
+  static postNew(req, res) {
     const { email, password } = req.body;
 
     if (!email) {
@@ -36,7 +36,7 @@ class UserController {
     });
   }
 
-  static async getMe (req, res) {
+  static async getMe(req, res) {
     const token = req.header('X-Token');
     const key = `auth_${token}`;
     const userId = await redisClient.get(key);
@@ -57,4 +57,4 @@ class UserController {
   }
 }
 
-module.exports = UserController;
+module.exports = UsersController;
