@@ -4,43 +4,32 @@ import dbClient from '../utils/db';
 import redisClient from '../utils/redis';
 
 class AuthController {
-  static async getConnect (req, res) {
-    const authHeader = req.header('Authorization');
-    let userData = authHeader.split(' ')[1];
-    const buff = Buffer.from(userData, 'base64');
-    userData = buff.toString('ascii');
-    const data = userData.split(':');
-
-    if (data.length !== 2) {
-      res.status(401).json({ error: 'Unauthorized' });
-      return;
+  static async getConnect(req, res) {
+    const userData = req.header('Authorization').split(' ')[1];
+    const [email, password] = Buffer.from(userData, 'base64').toString('ascii').split(':');
+    if (!email || !password) {
+      return res.status(401).json({ error: 'Unauthorized' });
     }
+    const user = await dbClient.dbClient.collection('users').findOne({ email, password: sha1(password) });
+    if (!user || user.password !== sha1(password)) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const token = uuidv4();
+    await redisClient.set(`auth_${token}`, user._id.toString(), 60 * 60 * 24);
 
-    const hashedpwd = sha1(data[1]);
-
-    const users = dbClient.db.collection('users');
-    users.findOne({ email: data[0], password: hashedpwd }, async (err, user) => {
-      if (user) {
-        const token = uuidv4();
-        const key = `auth_${token}`;
-        await redisClient.set(key, user._id.toString(), 60 * 60 * 24);
-        res.status(200).json({ token });
-      } else {
-        res.status(401).json({ error: 'Unauthorized' });
-      }
-    });
+    return res.status(200).json({ token });
   }
 
-  static async getDisconnect (req, res) {
+  static async getDisconnect(req, res) {
     const token = req.header('X-Token');
     const key = `auth_${token}`;
     const id = await redisClient.get(key);
 
     if (id) {
       await redisClient.del(key);
-      res.status(204).json({});
+      return res.status(204).end();
     } else {
-      res.status(401).json({ error: 'Unauthorized' });
+      return res.status(401).json({ error: 'Unauthorized' });
     }
   }
 }
